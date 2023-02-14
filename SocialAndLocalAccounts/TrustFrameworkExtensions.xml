@@ -4,12 +4,12 @@
   xmlns:xsd="http://www.w3.org/2001/XMLSchema" 
   xmlns="http://schemas.microsoft.com/online/cpim/schemas/2013/06" 
   PolicySchemaVersion="0.3.0.0" 
-  TenantId="yourtenant.onmicrosoft.com" 
+  TenantId="cyclelabsproduction.onmicrosoft.com" 
   PolicyId="B2C_1A_TrustFrameworkExtensions" 
-  PublicPolicyUri="http://yourtenant.onmicrosoft.com/B2C_1A_TrustFrameworkExtensions">
+  PublicPolicyUri="http://cyclelabsproduction.onmicrosoft.com/B2C_1A_TrustFrameworkExtensions">
   
   <BasePolicy>
-    <TenantId>yourtenant.onmicrosoft.com</TenantId>
+    <TenantId>cyclelabsproduction.onmicrosoft.com</TenantId>
     <PolicyId>B2C_1A_TrustFrameworkLocalization</PolicyId>
   </BasePolicy>
  <BuildingBlocks>
@@ -19,17 +19,49 @@
   <ClaimsProviders>
 
     <ClaimsProvider>
-      <DisplayName>Facebook</DisplayName>
-      <TechnicalProfiles>
-        <TechnicalProfile Id="Facebook-OAUTH">
-          <Metadata>
-            <Item Key="client_id">facebook_clientid</Item>
-            <Item Key="scope">email public_profile</Item>
-            <Item Key="ClaimsEndpoint">https://graph.facebook.com/me?fields=id,first_name,last_name,name,email</Item>
-          </Metadata>
-        </TechnicalProfile>
-      </TechnicalProfiles>
-    </ClaimsProvider>
+    <DisplayName>Token Issuer</DisplayName>
+    <TechnicalProfiles>
+      <TechnicalProfile Id="UserInfoIssuer">
+        <DisplayName>JSON Issuer</DisplayName>
+        <Protocol Name="None" />
+        <OutputTokenFormat>JSON</OutputTokenFormat>
+        <CryptographicKeys>
+          <Key Id="issuer_secret" StorageReferenceId="B2C_1A_TokenSigningKeyContainer" />
+        </CryptographicKeys>
+        <!-- The Below claims are what will be returned on the UserInfo Endpoint if in the Claims Bag-->
+        <InputClaims>
+          <InputClaim ClaimTypeReferenceId="objectId"/>
+          <InputClaim ClaimTypeReferenceId="givenName"/>
+          <InputClaim ClaimTypeReferenceId="surname"/>
+          <InputClaim ClaimTypeReferenceId="displayName"/>
+          <InputClaim ClaimTypeReferenceId="signInNames.emailAddress"/>
+        </InputClaims>
+      </TechnicalProfile>
+      <TechnicalProfile Id="UserInfoAuthorization">
+        <DisplayName>UserInfo authorization</DisplayName>
+        <Protocol Name="None" />
+        <InputTokenFormat>JWT</InputTokenFormat>
+        <Metadata>
+          <!-- Update the Issuer and Audience below -->
+          <!-- Audience is optional, Issuer is required-->
+          <Item Key="issuer">https://cyclelabsproduction.b2clogin.com/da6adbdc-a96e-41f2-984f-9d8934c2308f/v2.0/</Item>
+          <Item Key="audience">[ "ebb4384b-15eb-465c-abdb-fb711f39ae64" ]</Item>
+          <Item Key="client_assertion_type">urn:ietf:params:oauth:client-assertion-type:jwt-bearer</Item>
+        </Metadata>
+        <CryptographicKeys>
+          <Key Id="issuer_secret" StorageReferenceId="B2C_1A_TokenSigningKeyContainer" />
+        </CryptographicKeys>
+        <OutputClaims>
+          <OutputClaim ClaimTypeReferenceId="objectId" PartnerClaimType="sub"/>
+          <OutputClaim ClaimTypeReferenceId="signInNames.emailAddress" PartnerClaimType="email"/>
+          <!-- Optional claims to read from the access token. -->
+          <!-- <OutputClaim ClaimTypeReferenceId="givenName" PartnerClaimType="given_name"/>
+             <OutputClaim ClaimTypeReferenceId="surname" PartnerClaimType="family_name"/>
+             <OutputClaim ClaimTypeReferenceId="displayName" PartnerClaimType="name"/> -->
+        </OutputClaims>
+      </TechnicalProfile>
+    </TechnicalProfiles>
+  </ClaimsProvider>
 
 
     <ClaimsProvider>
@@ -37,12 +69,12 @@
       <TechnicalProfiles>
          <TechnicalProfile Id="login-NonInteractive">
           <Metadata>
-            <Item Key="client_id">ProxyIdentityExperienceFrameworkAppId</Item>
-            <Item Key="IdTokenAudience">IdentityExperienceFrameworkAppId</Item>
+            <Item Key="client_id">50edef51-4346-41a8-bc40-3b3f67dd601a</Item>
+            <Item Key="IdTokenAudience">432fecf4-9057-4487-9338-1fbd7f385a22</Item>
           </Metadata>
           <InputClaims>
-            <InputClaim ClaimTypeReferenceId="client_id" DefaultValue="ProxyIdentityExperienceFrameworkAppId" />
-            <InputClaim ClaimTypeReferenceId="resource_id" PartnerClaimType="resource" DefaultValue="IdentityExperienceFrameworkAppId" />
+            <InputClaim ClaimTypeReferenceId="client_id" DefaultValue="50edef51-4346-41a8-bc40-3b3f67dd601a" />
+            <InputClaim ClaimTypeReferenceId="resource_id" PartnerClaimType="resource" DefaultValue="432fecf4-9057-4487-9338-1fbd7f385a22" />
           </InputClaims>
         </TechnicalProfile>
       </TechnicalProfiles>
@@ -50,8 +82,30 @@
 
   </ClaimsProviders>
 
-    <!--UserJourneys>
+  <UserJourneys>
+
+    <UserJourney Id="UserInfoJourney" DefaultCpimIssuerTechnicalProfileReferenceId="UserInfoIssuer">
+      <Authorization>
+        <AuthorizationTechnicalProfiles>
+          <AuthorizationTechnicalProfile ReferenceId="UserInfoAuthorization" />
+        </AuthorizationTechnicalProfiles>
+      </Authorization>
+      <OrchestrationSteps >
+        <OrchestrationStep Order="1" Type="ClaimsExchange">
+          <Preconditions>
+            <Precondition Type="ClaimsExist" ExecuteActionsIf="false">
+              <Value>objectId</Value>
+              <Action>SkipThisOrchestrationStep</Action>
+            </Precondition>
+          </Preconditions>
+          <ClaimsExchanges UserIdentity="false">
+            <ClaimsExchange Id="AADUserReadWithObjectId" TechnicalProfileReferenceId="AAD-UserReadUsingObjectId" />
+          </ClaimsExchanges>
+        </OrchestrationStep>
+        <OrchestrationStep Order="2" Type="SendClaims" CpimIssuerTechnicalProfileReferenceId="UserInfoIssuer" />
+      </OrchestrationSteps>
+    </UserJourney>
 	
-	</UserJourneys-->
+	</UserJourneys>
 
 </TrustFrameworkPolicy>
